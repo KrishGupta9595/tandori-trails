@@ -179,7 +179,7 @@ export default function AdminLoginPage() {
               <p className="text-sm text-tandoori-charcoal-light">
                 <strong>Email:</strong> admin@gmail.com
                 <br />
-                <strong>Password:</strong> admin2024
+                <strong>Password:</strong> admin123
               </p>
               <p className="text-xs text-tandoori-charcoal-light mt-2 italic">
                 * Email is case-insensitive (ADMIN@GMAIL.COM also works)
