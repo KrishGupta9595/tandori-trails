@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Tandori Trails',
-  description: 'Created By Krish',
-  generator: 'Krish Productions',
+  title: 'v0 app',
+  description: 'Created By v0',
+  generator: 'v0.dev',
 }
 
 export default function RootLayout({
