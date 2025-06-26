@@ -171,7 +171,7 @@ export default function KitchenLoginPage() {
               <p className="text-sm text-tandoori-charcoal-light">
                 <strong>Email:</strong> kitchen@gmail.com
                 <br />
-                <strong>Password:</strong> kitchen2024
+                <strong>Password:</strong> kitchen123
               </p>
               <p className="text-xs text-tandoori-charcoal-light mt-2 italic">
                 * Email is case-insensitive (KITCHEN@GMAIL.COM also works)
