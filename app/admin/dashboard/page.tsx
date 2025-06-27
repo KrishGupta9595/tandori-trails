@@ -148,22 +148,6 @@ const topItems = Object.entries(itemMap)
 setTopItems(topItems)
 
 
-    const itemMap: Record<string, { quantity: number; revenue: number }> = {}
-
-    itemsData?.forEach((item) => {
-      const name = item.item_name
-      if (!itemMap[name]) {
-        itemMap[name] = { quantity: 0, revenue: 0 }
-      }
-      itemMap[name].quantity += item.quantity
-      itemMap[name].revenue += item.total_price
-    })
-
-    const topItems = Object.entries(itemMap)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5)
-
     setStats({
       totalOrders: orders.length,
       completedOrders: completedOrders.length,
