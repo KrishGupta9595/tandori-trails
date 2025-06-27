@@ -26,7 +26,33 @@ interface TopItem {
   revenue: number
 }
 
+
+import { createClient } from "@supabase/supabase-js"
+import { useEffect } from "react"
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 export default function AdminDashboard() {
+  useEffect(() => {
+    const subscription = supabase
+      .channel('admin-dashboard-live')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+      }, (payload) => {
+        console.log("Order update received in admin dashboard:", payload)
+        fetchDashboardData() // Refresh your dashboard data
+      })
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
   const [stats, setStats] = useState<DashboardStats>({
     totalOrders: 0,
     totalRevenue: 0,
