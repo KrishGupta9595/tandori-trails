@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BarChart3, TrendingUp, DollarSign, ShoppingBag, Users, Download, Home, LogOut } from "lucide-react"
 import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface DashboardStats {
   totalOrders: number
@@ -31,30 +34,16 @@ export default function AdminDashboard() {
     cancelledOrders: 0,
     avgOrderValue: 0,
   })
-
   const [topItems, setTopItems] = useState<TopItem[]>([])
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState("today")
 
   useEffect(() => {
+    // Check authentication
     checkAuth()
     fetchDashboardData()
   }, [dateFilter])
-
-  useEffect(() => {
-    const subscription = supabase
-      .channel("admin-dashboard-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
-        console.log("Realtime change:", payload)
-        fetchDashboardData()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(subscription)
-    }
-  }, [])
 
   const checkAuth = async () => {
     const {
@@ -65,6 +54,7 @@ export default function AdminDashboard() {
       return
     }
 
+    // Verify admin staff role (case-insensitive)
     const { data: staffUser } = await supabase
       .from("staff_users")
       .select("role")
@@ -83,76 +73,87 @@ export default function AdminDashboard() {
     window.location.href = "/"
   }
 
+  const fetchDashboardData = async () => {
+    try {
+      const dateCondition = getDateCondition()
+
+      // Fetch orders with date filter
+      const { data: orders } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          order_items (
+            quantity,
+            price,
+            menu_items (
+              name
+            )
+          )
+        `)
+        .gte("created_at", dateCondition)
+
+      if (orders) {
+        // Calculate stats
+        const totalOrders = orders.length
+        const totalRevenue = orders.reduce((sum, order) => sum + order.total_amount, 0)
+        const completedOrders = orders.filter((order) => order.status === "completed").length
+        const cancelledOrders = orders.filter((order) => order.status === "cancelled").length
+        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+        setStats({
+          totalOrders,
+          totalRevenue,
+          completedOrders,
+          cancelledOrders,
+          avgOrderValue,
+        })
+
+        // Calculate top items
+        const itemStats: { [key: string]: { quantity: number; revenue: number } } = {}
+
+        orders.forEach((order) => {
+          order.order_items.forEach((item: any) => {
+            const itemName = item.menu_items.name
+            if (!itemStats[itemName]) {
+              itemStats[itemName] = { quantity: 0, revenue: 0 }
+            }
+            itemStats[itemName].quantity += item.quantity
+            itemStats[itemName].revenue += item.price * item.quantity
+          })
+        })
+
+        const topItemsArray = Object.entries(itemStats)
+          .map(([name, stats]) => ({
+            name,
+            quantity: stats.quantity,
+            revenue: stats.revenue,
+          }))
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, 5)
+
+        setTopItems(topItemsArray)
+        setRecentOrders(orders.slice(0, 10))
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getDateCondition = () => {
     const now = new Date()
     switch (dateFilter) {
       case "today":
         return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
       case "week":
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return weekAgo.toISOString()
       case "month":
-        return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString()
+        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+        return monthAgo.toISOString()
       default:
         return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    }
-  }
-
-  const fetchDashboardData = async () => {
-    setLoading(true)
-    try {
-      const fromDate = getDateCondition()
-
-      const { data: orders, error } = await supabase
-        .from("orders")
-        .select("*")
-        .gte("created_at", fromDate)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      const completedOrders = orders.filter((o) => o.status === "completed")
-      const cancelledOrders = orders.filter((o) => o.status === "cancelled")
-      const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
-      const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
-      const orderIds = orders.map((order) => order.id)
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("order_items")
-        .select("item_name, quantity, total_price, order_id")
-        .in("order_id", orderIds)
-
-      if (itemsError) throw itemsError
-
-      const itemMap: Record<string, { quantity: number; revenue: number }> = {}
-
-      itemsData?.forEach((item) => {
-        const name = item.item_name
-        if (!itemMap[name]) {
-          itemMap[name] = { quantity: 0, revenue: 0 }
-        }
-        itemMap[name].quantity += item.quantity
-        itemMap[name].revenue += item.total_price
-      })
-
-      const topItems = Object.entries(itemMap)
-        .map(([name, data]) => ({ name, ...data }))
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5)
-
-      setStats({
-        totalOrders: orders.length,
-        completedOrders: completedOrders.length,
-        cancelledOrders: cancelledOrders.length,
-        totalRevenue,
-        avgOrderValue,
-      })
-
-      setRecentOrders(orders.slice(0, 10))
-      setTopItems(topItems)
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -169,14 +170,23 @@ export default function AdminDashboard() {
     const a = document.createElement("a")
     a.href = url
     a.download = `tandoori-trails-report-${dateFilter}-${new Date().toISOString().split("T")[0]}.json`
-
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
-  // 👇 Paste your JSX code here
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white flex items-center justify-center font-sans">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tandoori-amethyst mx-auto mb-4"></div>
+          <p className="text-lg text-tandoori-charcoal">Loading admin dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white font-sans">
       {/* Header */}
