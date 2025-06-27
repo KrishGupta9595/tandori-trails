@@ -161,6 +161,24 @@ export default function AdminDashboard() {
     }
   }
 
+  const downloadReport = () => {
+    const reportData = {
+      period: dateFilter,
+      stats,
+      topItems,
+      generatedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `tandoori-trails-report-${dateFilter}-${new Date().toISOString().split("T")[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex justify-center items-center">
@@ -170,8 +188,94 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gradient-to-br from-purple-100 via-white to-purple-50">
-      <p className="text-2xl font-semibold text-gray-800">Dashboard UI goes here...</p>
+    <div className="min-h-screen bg-white text-black p-6">
+      <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
+      <p className="mb-4">Welcome! Here's your real-time dashboard overview.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xl font-semibold">{stats.totalOrders}</p>
+            <p className="text-sm text-muted-foreground">{stats.completedOrders} completed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xl font-semibold">₹{stats.totalRevenue.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Avg. Order Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xl font-semibold">₹{stats.avgOrderValue.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancelled Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xl font-semibold">{stats.cancelledOrders}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-2">Top Items</h2>
+        {topItems.length === 0 ? (
+          <p>No top items found.</p>
+        ) : (
+          <ul className="space-y-2">
+            {topItems.map((item) => (
+              <li key={item.name} className="border p-3 rounded shadow">
+                <div className="flex justify-between">
+                  <span>{item.name}</span>
+                  <span>
+                    {item.quantity} sold • ₹{item.revenue.toFixed(2)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-2">Recent Orders</h2>
+        {recentOrders.length === 0 ? (
+          <p>No recent orders available.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recentOrders.map((order) => (
+              <li key={order.id} className="border p-3 rounded shadow">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="font-semibold">Order #{order.order_number}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.customer_name} • {new Date(order.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">₹{order.total_amount.toFixed(2)}</p>
+                    <Badge variant="outline">{order.status}</Badge>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <Button onClick={downloadReport} className="mt-4">
+        <Download className="mr-2 h-4 w-4" /> Export Report
+      </Button>
     </div>
   )
 }
