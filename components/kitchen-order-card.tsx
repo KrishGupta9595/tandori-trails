@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Clock, CheckCircle } from "lucide-react"
+import { Clock, ChefHat, CheckCircle } from "lucide-react"
 
 interface Order {
   id: string
@@ -63,72 +63,71 @@ export default function KitchenOrderCard({ order, onStatusUpdate }: KitchenOrder
   }
 
   const getNextStatusButton = () => {
-  switch (order.status) {
-    case "pending":
-      return (
-        <Button
-          onClick={() => handleStatusUpdate("preparing")}
-          disabled={updating}
-          className="bg-orange-500 hover:bg-orange-600 transition-all duration-200 w-full sm:w-auto"
-        >
-          <Clock className="mr-2 h-4 w-4" />
-          {updating ? "Updating..." : "Start Preparing"}
-        </Button>
-      )
-    case "preparing":
-      return (
-        <Button
-          onClick={() => handleStatusUpdate("prepared")}
-          disabled={updating}
-          className="bg-green-600 hover:bg-green-700 transition-all duration-200 w-full sm:w-auto"
-        >
-          <CheckCircle className="mr-2 h-4 w-4" />
-          {updating ? "Marking..." : "Mark Ready"}
-        </Button>
-      )
-    case "prepared":
-      return (
-        <Button
-          onClick={() => handleStatusUpdate("completed")}
-          disabled={updating}
-          className="bg-tandoori-amethyst hover:bg-tandoori-amethyst-dark transition-all duration-200 w-full sm:w-auto"
-        >
-          <CheckCircle className="mr-2 h-4 w-4" />
-          {updating ? "Completing..." : "Complete Order"}
-        </Button>
-      )
-    default:
-      return null
+    switch (order.status) {
+      case "pending":
+        return (
+          <Button
+            onClick={() => handleStatusUpdate("preparing")}
+            disabled={updating}
+            className="bg-orange-600 hover:bg-orange-700 transition-all duration-200"
+          >
+            <ChefHat className="mr-2 h-4 w-4" />
+            {updating ? "Starting..." : "Start Preparing"}
+          </Button>
+        )
+      case "preparing":
+        return (
+          <Button
+            onClick={() => handleStatusUpdate("prepared")}
+            disabled={updating}
+            className="bg-green-600 hover:bg-green-700 transition-all duration-200"
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            {updating ? "Marking..." : "Mark Ready"}
+          </Button>
+        )
+      case "prepared":
+        return (
+          <Button
+            onClick={() => handleStatusUpdate("completed")}
+            disabled={updating}
+            className="bg-tandoori-amethyst hover:bg-tandoori-amethyst-dark transition-all duration-200"
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            {updating ? "Completing..." : "Complete Order"}
+          </Button>
+        )
+      default:
+        return null
+    }
   }
-}
-
 
   return (
     <Card className="border border-tandoori-lavender rounded-lg hover:bg-tandoori-lavender-light transition-all duration-200 hover:shadow-md">
       <CardContent className="p-4">
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start space-y-4 lg:space-y-0">
+        <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="flex items-center space-x-3 mb-2">
               <Badge
                 variant="outline"
-                className="text-sm px-3 py-1 border-tandoori-amethyst text-tandoori-amethyst font-semibold"
+                className="text-lg px-3 py-1 border-tandoori-amethyst text-tandoori-amethyst font-semibold"
               >
                 Table {order.table_number}
               </Badge>
-              <Badge className={`${getStatusColor(order.status)} border px-2 py-1 font-medium text-xs`}>
+              <Badge className={`${getStatusColor(order.status)} border px-2 py-1 font-medium`}>
                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
               </Badge>
-              <div className="flex items-center text-xs text-tandoori-charcoal-light">
+              <div className="flex items-center text-sm text-tandoori-charcoal-light">
                 <Clock className="h-3 w-3 mr-1" />
                 {getTimeElapsed()}
               </div>
             </div>
 
-            <h4 className="font-semibold text-tandoori-charcoal mb-2 text-base lg:text-lg">
+            <h4 className="font-semibold text-tandoori-charcoal mb-1 text-lg">
               Order #{order.order_number} - {order.customer_name}
             </h4>
 
-            <p className="text-sm text-tandoori-charcoal-light mb-3">
+            <p className="text-sm text-tandoori-charcoal-light mb-2">
               Ordered at {new Date(order.created_at).toLocaleTimeString()}
             </p>
 
@@ -137,12 +136,10 @@ export default function KitchenOrderCard({ order, onStatusUpdate }: KitchenOrder
               {order.order_items.map((item) => `${item.menu_items.name} (${item.quantity})`).join(", ")}
             </div>
 
-            <p className="font-bold text-tandoori-amethyst text-base lg:text-lg">
-              Total: ₹{order.total_amount.toFixed(2)}
-            </p>
+            <p className="font-bold text-tandoori-amethyst text-lg">Total: ₹{order.total_amount.toFixed(2)}</p>
           </div>
 
-          <div className="lg:ml-4 flex flex-col space-y-2">{getNextStatusButton()}</div>
+          <div className="ml-4 flex flex-col space-y-2">{getNextStatusButton()}</div>
         </div>
       </CardContent>
     </Card>
