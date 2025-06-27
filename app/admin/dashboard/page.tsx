@@ -1,14 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, TrendingUp, DollarSign, ShoppingBag, Users, Download, Home, LogOut } from "lucide-react"
-import Link from "next/link"
 import { createClient } from "@supabase/supabase-js"
+import Link from "next/link"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,6 +31,7 @@ export default function AdminDashboard() {
     cancelledOrders: 0,
     avgOrderValue: 0,
   })
+
   const [topItems, setTopItems] = useState<TopItem[]>([])
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,68 +98,63 @@ export default function AdminDashboard() {
   }
 
   const fetchDashboardData = async () => {
-  setLoading(true)
-  try {
-    const fromDate = getDateCondition()
+    setLoading(true)
+    try {
+      const fromDate = getDateCondition()
 
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select("*")
-      .gte("created_at", fromDate)
-      .order("created_at", { ascending: false })
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("*")
+        .gte("created_at", fromDate)
+        .order("created_at", { ascending: false })
 
-    if (error) throw error
+      if (error) throw error
 
-    const completedOrders = orders.filter((o) => o.status === "completed")
-    const cancelledOrders = orders.filter((o) => o.status === "cancelled")
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
-    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+      const completedOrders = orders.filter((o) => o.status === "completed")
+      const cancelledOrders = orders.filter((o) => o.status === "cancelled")
+      const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
+      const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+      const orderIds = orders.map((order) => order.id)
 
-    const orderIds = orders.map((order) => order.id)
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("order_items")
+        .select("item_name, quantity, total_price, order_id")
+        .in("order_id", orderIds)
 
-const { data: itemsData, error: itemsError } = await supabase
-  .from("order_items")
-  .select("item_name, quantity, total_price, order_id")
-  .in("order_id", orderIds)
+      if (itemsError) throw itemsError
 
-if (itemsError) throw itemsError
+      const itemMap: Record<string, { quantity: number; revenue: number }> = {}
 
-const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+      itemsData?.forEach((item) => {
+        const name = item.item_name
+        if (!itemMap[name]) {
+          itemMap[name] = { quantity: 0, revenue: 0 }
+        }
+        itemMap[name].quantity += item.quantity
+        itemMap[name].revenue += item.total_price
+      })
 
-itemsData?.forEach((item) => {
-  const name = item.item_name
-  if (!itemMap[name]) {
-    itemMap[name] = { quantity: 0, revenue: 0 }
+      const topItems = Object.entries(itemMap)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5)
+
+      setStats({
+        totalOrders: orders.length,
+        completedOrders: completedOrders.length,
+        cancelledOrders: cancelledOrders.length,
+        totalRevenue,
+        avgOrderValue,
+      })
+
+      setRecentOrders(orders.slice(0, 10))
+      setTopItems(topItems)
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err)
+    } finally {
+      setLoading(false)
+    }
   }
-  itemMap[name].quantity += item.quantity
-  itemMap[name].revenue += item.total_price
-})
-
-const topItems = Object.entries(itemMap)
-  .map(([name, data]) => ({ name, ...data }))
-  .sort((a, b) => b.quantity - a.quantity)
-  .slice(0, 5)
-
-setTopItems(topItems)
-
-
-    setStats({
-      totalOrders: orders.length,
-      completedOrders: completedOrders.length,
-      cancelledOrders: cancelledOrders.length,
-      totalRevenue,
-      avgOrderValue,
-    })
-
-    setRecentOrders(orders.slice(0, 10))
-    setTopItems(topItems)
-  } catch (err) {
-    console.error("Error fetching dashboard data:", err)
-  } finally {
-    setLoading(false)
-  }
-}
-
 
   const downloadReport = () => {
     const reportData = {
@@ -173,6 +163,7 @@ setTopItems(topItems)
       topItems,
       generatedAt: new Date().toISOString(),
     }
+
     const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -185,16 +176,9 @@ setTopItems(topItems)
     URL.revokeObjectURL(url)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex justify-center items-center">
-        <p className="text-gray-600">Loading dashboard...</p>
-      </div>
-    )
-  }
-
+  // 👇 Paste your JSX code here
   return (
-     <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white font-sans">
       {/* Header */}
       <div className="bg-gradient-to-r from-tandoori-amethyst via-tandoori-amethyst-dark to-tandoori-amethyst-light text-white py-6 px-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
