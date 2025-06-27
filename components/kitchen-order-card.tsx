@@ -63,44 +63,45 @@ export default function KitchenOrderCard({ order, onStatusUpdate }: KitchenOrder
   }
 
   const getNextStatusButton = () => {
-    switch (order.status) {
-      case "pending":
-        return (
-          <Button
-            onClick={() => handleStatusUpdate("prepared")}
-            disabled={updating}
-            className="bg-green-600 hover:bg-green-700 transition-all duration-200 w-full sm:w-auto"
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            {updating ? "Marking..." : "Mark Ready"}
-          </Button>
-        )
-      case "preparing":
-        return (
-          <Button
-            onClick={() => handleStatusUpdate("prepared")}
-            disabled={updating}
-            className="bg-green-600 hover:bg-green-700 transition-all duration-200 w-full sm:w-auto"
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            {updating ? "Marking..." : "Mark Ready"}
-          </Button>
-        )
-      case "prepared":
-        return (
-          <Button
-            onClick={() => handleStatusUpdate("completed")}
-            disabled={updating}
-            className="bg-tandoori-amethyst hover:bg-tandoori-amethyst-dark transition-all duration-200 w-full sm:w-auto"
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            {updating ? "Completing..." : "Complete Order"}
-          </Button>
-        )
-      default:
-        return null
-    }
+  switch (order.status) {
+    case "pending":
+      return (
+        <Button
+          onClick={() => handleStatusUpdate("preparing")}
+          disabled={updating}
+          className="bg-orange-500 hover:bg-orange-600 transition-all duration-200 w-full sm:w-auto"
+        >
+          <Clock className="mr-2 h-4 w-4" />
+          {updating ? "Updating..." : "Start Preparing"}
+        </Button>
+      )
+    case "preparing":
+      return (
+        <Button
+          onClick={() => handleStatusUpdate("prepared")}
+          disabled={updating}
+          className="bg-green-600 hover:bg-green-700 transition-all duration-200 w-full sm:w-auto"
+        >
+          <CheckCircle className="mr-2 h-4 w-4" />
+          {updating ? "Marking..." : "Mark Ready"}
+        </Button>
+      )
+    case "prepared":
+      return (
+        <Button
+          onClick={() => handleStatusUpdate("completed")}
+          disabled={updating}
+          className="bg-tandoori-amethyst hover:bg-tandoori-amethyst-dark transition-all duration-200 w-full sm:w-auto"
+        >
+          <CheckCircle className="mr-2 h-4 w-4" />
+          {updating ? "Completing..." : "Complete Order"}
+        </Button>
+      )
+    default:
+      return null
   }
+}
+
 
   return (
     <Card className="border border-tandoori-lavender rounded-lg hover:bg-tandoori-lavender-light transition-all duration-200 hover:shadow-md">
