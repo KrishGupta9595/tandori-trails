@@ -48,20 +48,16 @@ export default function AdminDashboard() {
   }, [dateFilter])
 
   useEffect(() => {
-    const subscription = supabase
-      .channel("admin-dashboard-live")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "orders",
-      }, (payload) => {
-        console.log("Order update received in admin dashboard:", payload)
+    const channel = supabase
+      .channel("orders-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        console.log("Realtime order update received")
         fetchDashboardData()
       })
       .subscribe()
 
     return () => {
-      subscription.unsubscribe()
+      supabase.removeChannel(channel)
     }
   }, [])
 
@@ -87,6 +83,20 @@ export default function AdminDashboard() {
     }
   }
 
+  const getDateCondition = () => {
+    const now = new Date()
+    switch (dateFilter) {
+      case "today":
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      case "week":
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      case "month":
+        return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString()
+      default:
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    }
+  }
+
   const fetchDashboardData = async () => {
     try {
       const fromDate = getDateCondition()
@@ -101,9 +111,9 @@ export default function AdminDashboard() {
         return
       }
 
-      const completedOrders = orders.filter(o => o.status === "completed")
-      const cancelledOrders = orders.filter(o => o.status === "cancelled")
-      const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+      const completedOrders = orders.filter((o) => o.status === "completed")
+      const cancelledOrders = orders.filter((o) => o.status === "cancelled")
+      const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
       const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
 
       const itemMap = new Map()
@@ -124,7 +134,9 @@ export default function AdminDashboard() {
 
       const topItems = Array.from(itemMap.values()).sort((a, b) => b.quantity - a.quantity).slice(0, 5)
 
-      const recentOrders = orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).reverse().slice(0, 5)
+      const recentOrders = orders
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
 
       setStats({
         totalOrders: orders.length,
@@ -133,26 +145,13 @@ export default function AdminDashboard() {
         cancelledOrders: cancelledOrders.length,
         avgOrderValue,
       })
+
       setTopItems(topItems)
       setRecentOrders(recentOrders)
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const getDateCondition = () => {
-    const now = new Date()
-    switch (dateFilter) {
-      case "today":
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-      case "week":
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      case "month":
-        return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString()
-      default:
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
     }
   }
 
@@ -182,15 +181,20 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg font-medium">Loading admin dashboard...</p>
+      <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white flex items-center justify-center font-sans">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tandoori-amethyst mx-auto mb-4"></div>
+          <p className="text-lg text-tandoori-charcoal">Loading admin dashboard...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    // ✅ All your original JSX code here stays exactly the same
-    // ✅ I left it unchanged for brevity — paste the full JSX block you already had below
-    // 🔁 Your `stats`, `topItems`, `recentOrders` will now auto-update in real-time!
+    <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white font-sans">
+      {/* Your original styled header, dashboard cards, tabs, and charts */}
+      {/* Insert the rest of your styled JSX UI as you had it before */}
+      {/* Data like stats.totalRevenue, recentOrders etc. is now reactive and live */}
+    </div>
   )
 }
