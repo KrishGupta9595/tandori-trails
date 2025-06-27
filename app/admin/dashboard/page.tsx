@@ -1,3 +1,7 @@
+
+
+
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -50,18 +54,25 @@ export default function AdminDashboard() {
   useEffect(() => {
     const subscription = supabase
       .channel("admin-dashboard-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (payload) => {
+        console.log("Realtime change:", payload)
         fetchDashboardData()
       })
       .subscribe()
-    return () => supabase.removeChannel(subscription)
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
   }, [])
 
   const checkAuth = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return void (window.location.href = "/admin/login")
+    if (!user) {
+      window.location.href = "/admin/login"
+      return
+    }
 
     const { data: staffUser } = await supabase
       .from("staff_users")
@@ -76,95 +87,110 @@ export default function AdminDashboard() {
     }
   }
 
-  const getDateCondition = () => {
-    const now = new Date()
-    const dateStart = {
-      today: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-      week: new Date(now.getTime() - 7 * 86400000),
-      month: new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()),
-    }[dateFilter] || now
-    return dateStart.toISOString()
-  }
-
-  const fetchDashboardData = async () => {
-    setLoading(true)
-    try {
-      const fromDate = getDateCondition()
-
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select("*")
-        .gte("created_at", fromDate)
-        .order("created_at", { ascending: false })
-
-      if (ordersError) throw ordersError
-
-      const completed = orders.filter((o) => o.status === "completed")
-      const cancelled = orders.filter((o) => o.status === "cancelled")
-      const totalRevenue = completed.reduce((acc, o) => acc + (o.total_amount ?? 0), 0)
-      const avgOrderVal = completed.length ? totalRevenue / completed.length : 0
-
-      // 🔧 Debug log so you can inspect in browser console
-      console.log("ORDERS:", orders)
-
-      const { data: items, error: itemsError } = await supabase
-        .from("order_items")
-        .select("item_name, quantity, total_price")
-        .in("order_id", orders.map((o) => o.id))
-
-      if (itemsError) throw itemsError
-
-      console.log("ORDER ITEMS:", items)
-
-      const map: Record<string, { quantity: number; revenue: number }> = {}
-      items?.forEach((i: any) => {
-        map[i.item_name] ??= { quantity: 0, revenue: 0 }
-        map[i.item_name].quantity += i.quantity
-        map[i.item_name].revenue += i.total_price
-      })
-
-      const top = Object.entries(map)
-        .map(([name, v]) => ({ name, ...v }))
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5)
-
-      setStats({
-        totalOrders: orders.length,
-        completedOrders: completed.length,
-        cancelledOrders: cancelled.length,
-        totalRevenue,
-        avgOrderValue: avgOrderVal,
-      })
-      setRecentOrders(orders.slice(0, 10))
-      setTopItems(top)
-    } catch (err) {
-      console.error("Fetch error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = "/"
   }
 
-  const downloadReport = () => {
-    const blob = new Blob([JSON.stringify({ stats, topItems }, null, 2)], {
-      type: "application/json",
+  const getDateCondition = () => {
+    const now = new Date()
+    switch (dateFilter) {
+      case "today":
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      case "week":
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      case "month":
+        return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString()
+      default:
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    }
+  }
+
+  const fetchDashboardData = async () => {
+  setLoading(true)
+  try {
+    const fromDate = getDateCondition()
+
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("*")
+      .gte("created_at", fromDate)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    const completedOrders = orders.filter((o) => o.status === "completed")
+    const cancelledOrders = orders.filter((o) => o.status === "cancelled")
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
+    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select("item_name, quantity, total_price")
+      .gte("created_at", fromDate)
+
+    const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+
+    itemsData?.forEach((item) => {
+      const name = item.item_name
+      if (!itemMap[name]) {
+        itemMap[name] = { quantity: 0, revenue: 0 }
+      }
+      itemMap[name].quantity += item.quantity
+      itemMap[name].revenue += item.total_price
     })
+
+    const topItems = Object.entries(itemMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5)
+
+    setStats({
+      totalOrders: orders.length,
+      completedOrders: completedOrders.length,
+      cancelledOrders: cancelledOrders.length,
+      totalRevenue,
+      avgOrderValue,
+    })
+
+    setRecentOrders(orders.slice(0, 10))
+    setTopItems(topItems)
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err)
+  } finally {
+    setLoading(false)
+  }
+}
+
+
+  const downloadReport = () => {
+    const reportData = {
+      period: dateFilter,
+      stats,
+      topItems,
+      generatedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `report-${dateFilter}-${Date.now()}.json`
+    a.download = tandoori-trails-report-${dateFilter}-${new Date().toISOString().split("T")[0]}.json
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
-  if (loading) return <p>Loading dashboard...</p>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <p className="text-gray-600">Loading dashboard...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-white font-sans">
+     <div className="min-h-screen bg-gradient-to-br from-tandoori-lavender via-tandoori-lavender-light to-tandoori-white font-sans">
       {/* Header */}
       <div className="bg-gradient-to-r from-tandoori-amethyst via-tandoori-amethyst-dark to-tandoori-amethyst-light text-white py-6 px-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
