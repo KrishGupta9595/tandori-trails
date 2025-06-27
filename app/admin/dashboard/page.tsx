@@ -120,26 +120,29 @@ export default function AdminDashboard() {
     const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
     const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
 
-    const { data: itemsData } = await supabase
-      .from("order_items")
-      .select("item_name, quantity, total_price")
-      .gte("created_at", fromDate)
+    const { data: itemsData, error: itemsError } = await supabase
+  .from("order_items")
+  .select("quantity, total_price, menu_items(name)")
+  .gte("created_at", fromDate)
 
-    const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+if (itemsError) throw itemsError
 
-    itemsData?.forEach((item) => {
-      const name = item.item_name
-      if (!itemMap[name]) {
-        itemMap[name] = { quantity: 0, revenue: 0 }
-      }
-      itemMap[name].quantity += item.quantity
-      itemMap[name].revenue += item.total_price
-    })
+const itemMap: Record<string, { quantity: number; revenue: number }> = {}
 
-    const topItems = Object.entries(itemMap)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5)
+itemsData?.forEach((item) => {
+  const name = item.menu_items?.name || "Unknown Item"
+  if (!itemMap[name]) {
+    itemMap[name] = { quantity: 0, revenue: 0 }
+  }
+  itemMap[name].quantity += item.quantity
+  itemMap[name].revenue += item.total_price
+})
+
+const topItems = Object.entries(itemMap)
+  .map(([name, data]) => ({ name, ...data }))
+  .sort((a, b) => b.quantity - a.quantity)
+  .slice(0, 5)
+
 
     setStats({
       totalOrders: orders.length,
