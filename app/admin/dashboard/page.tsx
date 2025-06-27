@@ -1,3 +1,7 @@
+
+
+
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -120,10 +124,33 @@ export default function AdminDashboard() {
     const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
     const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
 
-    const { data: itemsData } = await supabase
-      .from("order_items")
-      .select("item_name, quantity, total_price")
-      .gte("created_at", fromDate)
+    const orderIds = orders.map((order) => order.id)
+
+const { data: itemsData, error: itemsError } = await supabase
+  .from("order_items")
+  .select("item_name, quantity, total_price, order_id")
+  .in("order_id", orderIds)
+
+if (itemsError) throw itemsError
+
+const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+
+itemsData?.forEach((item) => {
+  const name = item.item_name
+  if (!itemMap[name]) {
+    itemMap[name] = { quantity: 0, revenue: 0 }
+  }
+  itemMap[name].quantity += item.quantity
+  itemMap[name].revenue += item.total_price
+})
+
+const topItems = Object.entries(itemMap)
+  .map(([name, data]) => ({ name, ...data }))
+  .sort((a, b) => b.quantity - a.quantity)
+  .slice(0, 5)
+
+setTopItems(topItems)
+
 
     const itemMap: Record<string, { quantity: number; revenue: number }> = {}
 
