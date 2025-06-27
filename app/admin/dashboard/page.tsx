@@ -103,64 +103,61 @@ export default function AdminDashboard() {
   }
 
   const fetchDashboardData = async () => {
-  setLoading(true)
-  try {
-    const fromDate = getDateCondition()
+    setLoading(true)
+    try {
+      const fromDate = getDateCondition()
 
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select("*")
-      .gte("created_at", fromDate)
-      .order("created_at", { ascending: false })
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("*")
+        .gte("created_at", fromDate)
+        .order("created_at", { ascending: false })
 
-    if (error) throw error
+      if (ordersError) throw ordersError
 
-    const completedOrders = orders.filter((o) => o.status === "completed")
-    const cancelledOrders = orders.filter((o) => o.status === "cancelled")
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
-    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+      const completedOrders = orders.filter((o) => o.status === "completed")
+      const cancelledOrders = orders.filter((o) => o.status === "cancelled")
+      const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
+      const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
 
-    const { data: itemsData, error: itemsError } = await supabase
-  .from("order_items")
-  .select("quantity, total_price, menu_items(name)")
-  .gte("created_at", fromDate)
+      const { data: orderItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select("item_name, quantity, total_price, created_at")
+        .gte("created_at", fromDate)
 
-if (itemsError) throw itemsError
+      if (itemsError) throw itemsError
 
-const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+      const itemMap: Record<string, { quantity: number; revenue: number }> = {}
 
-itemsData?.forEach((item) => {
-  const name = item.menu_items?.name || "Unknown Item"
-  if (!itemMap[name]) {
-    itemMap[name] = { quantity: 0, revenue: 0 }
+      orderItems.forEach((item) => {
+        if (!itemMap[item.item_name]) {
+          itemMap[item.item_name] = { quantity: 0, revenue: 0 }
+        }
+        itemMap[item.item_name].quantity += item.quantity
+        itemMap[item.item_name].revenue += item.total_price
+      })
+
+      const topItems = Object.entries(itemMap)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5)
+
+      setStats({
+        totalOrders: orders.length,
+        completedOrders: completedOrders.length,
+        cancelledOrders: cancelledOrders.length,
+        totalRevenue,
+        avgOrderValue,
+      })
+
+      setRecentOrders(orders.slice(0, 10))
+      setTopItems(topItems)
+    } catch (err) {
+      console.error("Fetch error:", err)
+    } finally {
+      setLoading(false)
+    }
   }
-  itemMap[name].quantity += item.quantity
-  itemMap[name].revenue += item.total_price
-})
-
-const topItems = Object.entries(itemMap)
-  .map(([name, data]) => ({ name, ...data }))
-  .sort((a, b) => b.quantity - a.quantity)
-  .slice(0, 5)
-
-
-    setStats({
-      totalOrders: orders.length,
-      completedOrders: completedOrders.length,
-      cancelledOrders: cancelledOrders.length,
-      totalRevenue,
-      avgOrderValue,
-    })
-
-    setRecentOrders(orders.slice(0, 10))
-    setTopItems(topItems)
-  } catch (err) {
-    console.error("Error fetching dashboard data:", err)
-  } finally {
-    setLoading(false)
-  }
-}
-
 
   const downloadReport = () => {
     const reportData = {
@@ -179,8 +176,7 @@ const topItems = Object.entries(itemMap)
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
-
-  if (loading) {
+if (loading) {
     return (
       <div className="min-h-screen flex justify-center items-center">
         <p className="text-gray-600">Loading dashboard...</p>
