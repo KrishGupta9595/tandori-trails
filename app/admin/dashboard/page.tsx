@@ -103,38 +103,61 @@ export default function AdminDashboard() {
   }
 
   const fetchDashboardData = async () => {
-    setLoading(true)
-    try {
-      // TODO: Implement fetching logic for orders, top items, etc.
-      // This is just a placeholder for demonstration
-      setStats({
-        totalOrders: 42,
-        totalRevenue: 7860,
-        completedOrders: 38,
-        cancelledOrders: 4,
-        avgOrderValue: 186.9,
-      })
-      setTopItems([
-        { name: "Paneer Tikka", quantity: 35, revenue: 4200 },
-        { name: "Butter Chicken", quantity: 20, revenue: 2400 },
-      ])
-      setRecentOrders([
-        {
-          id: 1,
-          order_number: "#A1001",
-          table_number: 3,
-          customer_name: "Ravi Kumar",
-          created_at: new Date().toISOString(),
-          total_amount: 650,
-          status: "completed",
-        },
-      ])
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err)
-    } finally {
-      setLoading(false)
-    }
+  setLoading(true)
+  try {
+    const fromDate = getDateCondition()
+
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("*")
+      .gte("created_at", fromDate)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    const completedOrders = orders.filter((o) => o.status === "completed")
+    const cancelledOrders = orders.filter((o) => o.status === "cancelled")
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_amount, 0)
+    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select("item_name, quantity, total_price")
+      .gte("created_at", fromDate)
+
+    const itemMap: Record<string, { quantity: number; revenue: number }> = {}
+
+    itemsData?.forEach((item) => {
+      const name = item.item_name
+      if (!itemMap[name]) {
+        itemMap[name] = { quantity: 0, revenue: 0 }
+      }
+      itemMap[name].quantity += item.quantity
+      itemMap[name].revenue += item.total_price
+    })
+
+    const topItems = Object.entries(itemMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5)
+
+    setStats({
+      totalOrders: orders.length,
+      completedOrders: completedOrders.length,
+      cancelledOrders: cancelledOrders.length,
+      totalRevenue,
+      avgOrderValue,
+    })
+
+    setRecentOrders(orders.slice(0, 10))
+    setTopItems(topItems)
+  } catch (err) {
+    console.error("Error fetching dashboard data:", err)
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const downloadReport = () => {
     const reportData = {
